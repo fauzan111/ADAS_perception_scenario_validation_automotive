@@ -1,0 +1,25 @@
+# Starter scenario catalogue. Each scenario will run in MetaDrive (local) and CARLA (cloud).
+scenarios:
+  - name: cut_in_day
+    kind: cut_in
+    ego_speed_kph: 90
+    params: {cut_in_gap_m: 15, cutter_speed_kph: 70}
+  - name: cut_in_rain
+    kind: cut_in
+    ego_speed_kph: 90
+    weather: rain
+    params: {cut_in_gap_m: 15, cutter_speed_kph: 70}
+  - name: occluded_pedestrian_day
+    kind: occluded_pedestrian
+    ego_speed_kph: 40
+    params: {pedestrian_speed_mps: 1.4, occluder: parked_van}
+  - name: occluded_pedestrian_night
+    kind: occluded_pedestrian
+    ego_speed_kph: 40
+    lighting: night
+    params: {pedestrian_speed_mps: 1.4, occluder: parked_van}
+  - name: lead_brake_fog
+    kind: lead_brake
+    ego_speed_kph: 110
+    weather: fog
+    params: {lead_decel_mps2: 6.0, initial_gap_m: 40}
