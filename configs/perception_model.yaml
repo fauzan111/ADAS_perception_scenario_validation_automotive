@@ -1,0 +1,18 @@
+# Perception error model (src/adas_validation/perception.py).
+#
+# STATUS: assumed values, not yet calibrated. They are chosen to be plausible for a
+# camera + radar ADAS stack, and they will be replaced by measurements from the nuScenes
+# evaluation (recall vs range per class, day vs night, clear vs rain) in weeks 1-2.
+# Every scenario result produced with these values says so.
+
+latency_s: 0.10               # sensing + processing delay before the controller sees a frame
+min_visible_fraction: 0.5     # an object less than half visible is not detected
+ghost_rate_hz: 0.02           # false obstacles in the ego path (phantom-braking risk)
+
+classes:
+  car:        {r50_m: 80.0, softness_m: 8.0, p_max: 0.97, sigma_m: 0.3, sigma_growth: 0.3}
+  pedestrian: {r50_m: 35.0, softness_m: 5.0, p_max: 0.92, sigma_m: 0.25, sigma_growth: 0.4}
+
+# Multiply the 50 % detection range (range_factor) and the position noise (noise_factor).
+range_factor: {day: 1.0, dusk: 0.85, night: 0.6, clear: 1.0, rain: 0.8, fog: 0.5}
+noise_factor: {day: 1.0, dusk: 1.1, night: 1.5, clear: 1.0, rain: 1.3, fog: 1.6}

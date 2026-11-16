@@ -10,22 +10,33 @@ Software-defined vehicle programmes such as Stellantis STLA Brain are limited by
 
 ## What it does
 
-- 3D / BEV detection on nuScenes-mini (mAP, NDS)
-- Declarative scenario catalogue (YAML) with validated parameters
-- Safety metrics: time-to-collision, scenario pass rate by lighting and weather
+- 3D / BEV detection on nuScenes-mini (mAP, NDS), broken down by range, class, night and rain
+- Scenario catalogue (YAML) expanded over lighting x weather: cut-in, occluded pedestrian,
+  lead-vehicle braking
+- Closed loop in MetaDrive: ground truth -> **perception error model** (detection probability
+  by range and condition, noise, latency, ghosts, line-of-sight occlusion) -> tracker ->
+  ACC/AEB -> vehicle. The nuScenes measurements calibrate the error model.
+- Safety metrics from ground truth: collisions, impact speed, minimum TTC, first-detection
+  range; pass rates with Wilson 95% confidence intervals
 - SOTIF-style table of triggering conditions
-- Fast loop in MetaDrive on Mac; showcase run in CARLA on a cloud GPU (docs/COMPUTE.md)
+- Showcase run in CARLA on a cloud GPU (docs/COMPUTE.md)
 
 ## Results
 
+First catalogue run: 18 scenarios x 30 perception seeds = 540 runs (about 20 s on a Mac).
+**The perception error model still uses assumed parameters**; these numbers will change once
+it is calibrated from nuScenes.
+
 | Metric | Value |
 |---|---|
-| mAP / NDS (nuScenes-mini) | TBD |
-| Scenario pass rate (overall) | TBD |
-| Pass rate at night vs day | TBD |
-| Worst-case minimum TTC (s) | TBD |
+| mAP / NDS (nuScenes-mini) | pending (dataset download) |
+| Scenario pass rate, overall (no collision) | 368/540 = 68% (95% CI 64-72%) |
+| Pass rate day vs night | 79% vs 57% |
+| Pass rate clear / rain / fog | 89% / 56% / 59% |
+| Hardest scenario | occluded pedestrian in rain: 0/30 by day and by night |
 
-*Filled in as the roadmap progresses.*
+Full tables: `make scenarios` writes `results/catalogue/report.md`. What went wrong on the
+way (and was fixed) is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Quickstart
 
@@ -33,8 +44,9 @@ Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
 make setup        # core only
-make setup-all    # + perception and simulator extras
-make test
+make setup-sim    # + MetaDrive (Python 3.11)
+make test         # 16 tests, including a MetaDrive smoke run
+make scenarios    # catalogue x 30 seeds -> results/catalogue/report.md
 ```
 
 ## Roadmap

@@ -1,25 +1,21 @@
-# Starter scenario catalogue. Each scenario will run in MetaDrive (local) and CARLA (cloud).
+# Scenario catalogue. Every scenario without its own lighting/weather is expanded over the
+# matrix below (name -> <name>_<lighting>_<weather>), so each kind is tested in each condition.
+# Conditions act through the perception error model (configs/perception_model.yaml) and,
+# for rain, through the lower braking limit (adas.MAX_DECEL).
+matrix:
+  lighting: [day, night]
+  weather: [clear, rain, fog]
+
 scenarios:
-  - name: cut_in_day
+  - name: cut_in
     kind: cut_in
     ego_speed_kph: 90
-    params: {cut_in_gap_m: 15, cutter_speed_kph: 70}
-  - name: cut_in_rain
-    kind: cut_in
-    ego_speed_kph: 90
-    weather: rain
-    params: {cut_in_gap_m: 15, cutter_speed_kph: 70}
-  - name: occluded_pedestrian_day
+    params: {cut_in_gap_m: 20, cutter_speed_kph: 60, lane_change_s: 2.5}
+  - name: occluded_pedestrian
     kind: occluded_pedestrian
     ego_speed_kph: 40
-    params: {pedestrian_speed_mps: 1.4, occluder: parked_van}
-  - name: occluded_pedestrian_night
-    kind: occluded_pedestrian
-    ego_speed_kph: 40
-    lighting: night
-    params: {pedestrian_speed_mps: 1.4, occluder: parked_van}
-  - name: lead_brake_fog
+    params: {pedestrian_speed_mps: 1.4, van_distance_m: 45, trigger_distance_m: 25}
+  - name: lead_brake
     kind: lead_brake
-    ego_speed_kph: 110
-    weather: fog
-    params: {lead_decel_mps2: 6.0, initial_gap_m: 40}
+    ego_speed_kph: 90
+    params: {lead_decel_mps2: 6.0, initial_gap_m: 30, brake_at_s: 2.0}

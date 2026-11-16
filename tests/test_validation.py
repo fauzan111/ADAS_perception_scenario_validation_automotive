@@ -22,8 +22,9 @@ def test_scenario_rules():
 
 def test_catalogue_loads():
     sc = load_scenarios(CONFIG)
-    assert len(sc) == 5
+    assert len(sc) == 3 * 2 * 3          # 3 kinds x 2 lighting x 3 weather
     assert {s.kind for s in sc} == {"cut_in", "occluded_pedestrian", "lead_brake"}
+    assert "cut_in_night_fog" in {s.name for s in sc}
 
 
 def test_invalid_scenario_rejected():
