@@ -1,0 +1,46 @@
+# Perception error model MEASURED with scripts/calibrate_detector.py +
+# fit_perception_model.py: torchvision Faster R-CNN MobileNetV3-FPN (COCO) on
+# MetaDrive camera renders (960x540, 60 deg HFOV, 1.4 m mount), day image degraded
+# for night / fog / rain. Detection curves and per-class range factors are
+# measured; dusk, position noise, latency and ghost rate keep the assumed
+# values from perception_model.yaml. Synthetic images: see README for the gap
+# to nuScenes.
+latency_s: 0.1
+min_visible_fraction: 0.5
+ghost_rate_hz: 0.02
+classes:
+  car:
+    r50_m: 65.8
+    softness_m: 1.0
+    p_max: 0.9
+    sigma_m: 0.3
+    sigma_growth: 0.3
+  pedestrian:
+    r50_m: 64.3
+    softness_m: 2.0
+    p_max: 1.0
+    sigma_m: 0.25
+    sigma_growth: 0.4
+range_factor:
+  day: 1.0
+  dusk: 0.85
+  night: 0.764
+  clear: 1.0
+  rain: 0.458
+  fog: 0.456
+noise_factor:
+  day: 1.0
+  dusk: 1.1
+  night: 1.5
+  clear: 1.0
+  rain: 1.3
+  fog: 1.6
+class_range_factor:
+  car:
+    night: 0.947
+    rain: 0.333
+    fog: 0.447
+  pedestrian:
+    night: 0.582
+    rain: 0.582
+    fog: 0.465

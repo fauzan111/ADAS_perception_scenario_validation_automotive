@@ -1,9 +1,34 @@
 # Roadmap: ADAS Perception + Scenario Validation
 
-## Week 1-2: perception
+## Week 1-2: perception (re-planned: no dataset download)
 
-- [ ] nuScenes-mini loaded; visualise boxes in camera and BEV
-- [ ] Pretrained 3D detector evaluated (mAP, NDS); per-class and per-distance breakdown
+- [x] Detector measured on simulator images: torchvision Faster R-CNN on MetaDrive renders,
+      recall vs range for car / pedestrian under day, night, fog, rain and combinations
+- [x] Published nuScenes results as the real-world cross-check (DETR3D AP by distance,
+      night/rain; MonoDIS class AP) and a nuScenes-anchored perception model
+- [ ] Optional: 3D detector on nuScenes-mini (needs registration + 4 GB download)
+
+### Perception notes (2026-11-16)
+
+- macOS can't render MetaDrive offscreen from a non-GUI process (simplepbr gets no buffer,
+  even outside the sandbox), so rendering runs in Docker: Xvfb + Mesa llvmpipe (GL 3.3).
+  `xvfb-run` hangs as PID 1 (it waits for SIGUSR1); a small entrypoint starts Xvfb itself.
+  MetaDrive's depth camera needs compute shaders (not available there), so per-pixel depth
+  for fog/rain comes from the scene geometry (flat road, object box, sky).
+- First calibration run had three measurement bugs, found from the curves and images:
+  - The ego origin is 0.595 m above the road, so the "1.5 m" camera was ~2.1 m up and all
+    projected boxes sat too high (confirmed by fitting box bottoms vs 1/range: 1.98 m).
+  - IoU >= 0.3 rejected correct detections of distant cars (a few pixels of projection error
+    on a 20-pixel box); both classes showed the same fake cliff at 64 m. Switched to centre
+    matching (nuScenes also matches on centre distance). The real limit: MetaDrive draws the
+    car to 100 m, and this detector loses it at ~65-70 m (~19 px wide).
+  - Night without any lights made cars undetectable at every range. Added low beams
+    (inverse-square, road and objects) and taillights. Night range factor: car 0.95
+    (nuScenes DETR3D night/day car AP 0.95), pedestrian 0.58.
+- Positions outside the 60 deg field of view are excluded from the fit (geometry, not recall).
+- Results with three perception models: see README. Robust across all three: occluded
+  pedestrian in rain 0/60 (occlusion + wet-road braking). Strongly model-dependent: lead-car
+  braking at 90 km/h with a 30 m gap (74% / 35% / 9%).
 
 ## Week 3-4: scenarios (started first, while the nuScenes download is pending)
 
@@ -11,7 +36,7 @@
 - [x] Pass-rate report by kind, lighting and weather (Wilson 95% CIs)
 - [ ] Failure table in SOTIF style (triggering conditions) and parameter sweeps
       (gap x speed, trigger distance x speed) to find the pass/fail boundaries
-- [ ] Calibrate the perception error model from the nuScenes results (weeks 1-2)
+- [x] Calibrate the perception error model (sim-measured + nuScenes-anchored, see above)
 
 ### Scenario notes (2026-11-16)
 

@@ -1,0 +1,44 @@
+# Perception error model ANCHORED TO PUBLISHED nuScenes RESULTS (no nuScenes download):
+# car curve fitted to camera-only DETR3D car AP by distance (TransCAR, arXiv
+# 2305.00397, Table 6); pedestrian range x MonoDIS pedestrian/car AP ratio (nuScenes
+# paper, Table 6). AP is used as a proxy for detection probability. Condition factors
+# come from the MetaDrive renders (perception_model_measured.yaml).
+latency_s: 0.1
+min_visible_fraction: 0.5
+ghost_rate_hz: 0.02
+classes:
+  car:
+    r50_m: 28.0
+    softness_m: 8.0
+    p_max: 0.84
+    sigma_m: 0.3
+    sigma_growth: 0.3
+  pedestrian:
+    r50_m: 21.7
+    softness_m: 6.2
+    p_max: 0.84
+    sigma_m: 0.25
+    sigma_growth: 0.4
+range_factor:
+  day: 1.0
+  dusk: 0.85
+  night: 0.764
+  clear: 1.0
+  rain: 0.458
+  fog: 0.456
+noise_factor:
+  day: 1.0
+  dusk: 1.1
+  night: 1.5
+  clear: 1.0
+  rain: 1.3
+  fog: 1.6
+class_range_factor:
+  car:
+    night: 0.947
+    rain: 0.333
+    fog: 0.447
+  pedestrian:
+    night: 0.582
+    rain: 0.582
+    fog: 0.465

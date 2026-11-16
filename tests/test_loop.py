@@ -157,3 +157,18 @@ def test_metadrive_smoke():
     r = run_scenario(sc, 0, model, max_time_s=12.0)
     assert not r.collided and r.end_reason == "stopped"
     assert math.isfinite(r.min_ttc_s) and r.first_detect_range_m is not None
+
+
+def test_per_class_condition_factor_overrides_shared_one():
+    m = PerceptionModel.from_yaml(MODEL)
+    car_before = m.detection_probability("car", 40, "night", "clear")
+    m.class_range_factor = {"pedestrian": {"night": 0.3}}
+    assert m.detection_probability("car", 40, "night", "clear") == car_before
+    assert m.detection_probability("pedestrian", 20, "night", "clear") < \
+        m.detection_probability("pedestrian", 20, "day", "clear") * 0.5
+
+
+def test_measured_and_anchored_models_load():
+    for name in ("perception_model_measured.yaml", "perception_model_nuscenes_anchored.yaml"):
+        m = PerceptionModel.from_yaml(ROOT / "configs" / name)
+        assert m.classes["car"].r50_m > 0 and "night" in m.class_range_factor["pedestrian"]

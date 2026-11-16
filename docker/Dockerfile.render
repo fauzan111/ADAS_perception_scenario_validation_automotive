@@ -1,0 +1,20 @@
+# Headless MetaDrive camera rendering + detector inference (CPU).
+# macOS cannot render MetaDrive offscreen from a non-GUI process, so rendering runs here:
+# Xvfb (virtual display) + Mesa software OpenGL. Usage: make render-calibration
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      xvfb libgl1 libglx-mesa0 libgl1-mesa-dri libegl1 libglu1-mesa libxrender1 \
+      libxext6 libsm6 libx11-6 libxxf86vm1 libxrandr2 libxcursor1 libxi6 libxinerama1 \
+      libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir "metadrive-simulator==0.4.3" pyyaml \
+ && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+      "torch==2.5.1" "torchvision==0.20.1"
+# Pull MetaDrive's asset pack at build time (otherwise each run downloads it).
+RUN python -c "from metadrive.pull_asset import pull_asset; pull_asset(update=False)" || true
+
+WORKDIR /work
+ENV PYTHONPATH=/work/src MESA_GL_VERSION_OVERRIDE=3.3 LIBGL_ALWAYS_SOFTWARE=1
+COPY docker/entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

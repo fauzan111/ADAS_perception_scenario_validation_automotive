@@ -61,6 +61,9 @@ class PerceptionModel:
     latency_s: float = 0.1
     min_visible_fraction: float = 0.5         # less visible than this -> not detected
     ghost_rate_hz: float = 0.0                # false positives in the ego path, per second
+    # optional per-class overrides of range_factor, e.g. {"pedestrian": {"night": 0.59}}:
+    # measured night loss differs by class (cars carry lights, pedestrians do not)
+    class_range_factor: dict = field(default_factory=dict)
     _queue: deque = field(default_factory=deque, repr=False)
 
     @classmethod
@@ -70,14 +73,16 @@ class PerceptionModel:
             classes={k: ClassParams(**v) for k, v in raw["classes"].items()},
             range_factor=raw["range_factor"], noise_factor=raw["noise_factor"],
             latency_s=raw["latency_s"], min_visible_fraction=raw["min_visible_fraction"],
-            ghost_rate_hz=raw["ghost_rate_hz"])
+            ghost_rate_hz=raw["ghost_rate_hz"],
+            class_range_factor=raw.get("class_range_factor", {}))
 
     def detection_probability(self, cls: str, rng_m: float, lighting: str, weather: str,
                               visible_fraction: float = 1.0) -> float:
         if visible_fraction < self.min_visible_fraction:
             return 0.0
         p = self.classes[cls]
-        r50 = p.r50_m * self.range_factor[lighting] * self.range_factor[weather]
+        rf = {**self.range_factor, **self.class_range_factor.get(cls, {})}
+        r50 = p.r50_m * rf[lighting] * rf[weather]
         return p.p_max / (1.0 + math.exp((rng_m - r50) / p.softness_m))
 
     def position_sigma(self, cls: str, rng_m: float, lighting: str, weather: str) -> float:
