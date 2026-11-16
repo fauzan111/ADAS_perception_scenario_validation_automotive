@@ -47,5 +47,5 @@ Percezione 3D su nuScenes e validazione basata su scenari (sorpasso stretto, ped
 
 ## Licence
 
-Code: MIT (add a `LICENSE` file when you create the GitHub repo). Datasets and third-party
+Code: MIT, see [LICENSE](LICENSE). Datasets and third-party
 assets keep their own licences; see [data/README.md](data/README.md).
