@@ -13,6 +13,7 @@ from true gaps. Perception only decides what the controller believes.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -156,10 +157,12 @@ class LongitudinalLoop:
 def run_scenario(sc: Scenario, seed: int, model: PerceptionModel, env=None,
                  max_time_s: float = 20.0, keep_trace: bool = False,
                  max_decel: float | None = None, confirm_hits: int = 3,
-                 known_lead_accel: bool = False) -> RunResult:
+                 known_lead_accel: bool = False,
+                 on_frame: Callable | None = None) -> RunResult:
     """One scenario run. Pass an open MetaDrive env to reuse it across runs.
     max_decel, confirm_hits and known_lead_accel (hazard tracks carry the true acceleration)
-    change the system for counterfactual runs (sotif.py)."""
+    change the system for counterfactual runs (sotif.py). on_frame(env, bodies, k) is called
+    after every simulator step (demo.py grabs camera frames there)."""
     from metadrive.component.traffic_participants.pedestrian import Pedestrian
     from metadrive.component.vehicle.vehicle_type import DefaultVehicle, LVehicle
 
@@ -213,12 +216,14 @@ def run_scenario(sc: Scenario, seed: int, model: PerceptionModel, env=None,
             break
         # perception: true objects in the ego sensor frame (front bumper)
         sx, sy = ego_x + EGO_LEN / 2, ego_y
-        objs = []
+        objs, hz_vis = [], 0.0
         for a in script.actors.values():
             if a.cls == "occluder":
                 continue
             near_x = a.x - (a.length / 2 if a.cls == "car" else 0.0)
             vis = visible_fraction((sx, sy), a.box(), script.occluders())
+            if a.obj_id == script.hazard:
+                hz_vis = vis
             if (a.obj_id == script.hazard and first_visible is None
                     and vis >= model.min_visible_fraction):
                 first_visible = math.hypot(near_x - sx, a.y - sy)
@@ -239,13 +244,20 @@ def run_scenario(sc: Scenario, seed: int, model: PerceptionModel, env=None,
         throttle = loop(out.accel, a_meas)
         if keep_trace:
             trace.append(dict(t=round(t, 2), ego_x=ego_x, ego_y=ego_y, ego_v=ego_v, hz_x=hazard.x,
-                              hz_y=hazard.y, mode=out.mode, accel_cmd=out.accel,
-                              n_tracks=len(tracks), ttc_true=true_ttc(ego_x, ego_v, hazard)))
+                              hz_y=hazard.y, hz_vx=hazard.vx, hz_vis=hz_vis, mode=out.mode,
+                              accel_cmd=out.accel, n_tracks=len(tracks),
+                              ttc_true=true_ttc(ego_x, ego_v, hazard),
+                              # sensor frame (front bumper); detections describe t - latency
+                              dets=[(d.obj_id, d.x, d.y) for d in dets],
+                              tracks=[(tr.obj_id, tr.x, tr.y, tr.vx + ego_v, tr.vy)
+                                      for tr in tracks]))
         for name, a in script.actors.items():
             bodies[name].set_position((x_origin + a.x, a.y))
             if a.cls != "pedestrian":
                 bodies[name].set_velocity([1, 0], a.vx)
         _, _, _, _, info = env.step([float(np.clip(steer, -1, 1)), throttle])
+        if on_frame is not None:
+            on_frame(env, bodies, k)
         if info.get("crash_vehicle") or info.get("crash_human"):
             # physics contact can happen a hair before the box check and shove the ego aside
             collided, impact, end = True, ego_v * 3.6, "collision"
@@ -276,12 +288,18 @@ def _wrap(a: float) -> float:
     return (a + math.pi) % (2 * math.pi) - math.pi
 
 
-def make_env():
+def make_env(camera: tuple[int, int] | None = None):
+    """camera=(width, height) adds an RGB camera (needs a display: Docker, see demo.py)."""
     from metadrive.envs.metadrive_env import MetaDriveEnv
-    return MetaDriveEnv(dict(
+    cfg = dict(
         use_render=False, map="S" * 14, traffic_density=0.0, num_scenarios=1, start_seed=0,
         log_level=50, random_spawn_lane_index=False,
         vehicle_config=dict(spawn_lane_index=(">", ">>", 1), spawn_velocity=[20.0, 0.0]),
         decision_repeat=5, physics_world_step_size=DT / 5,
         out_of_road_done=False, crash_vehicle_done=False, crash_human_done=False,
-        crash_object_done=False, horizon=100000))
+        crash_object_done=False, horizon=100000)
+    if camera is not None:
+        from metadrive.component.sensors.rgb_camera import RGBCamera
+        cfg.update(image_observation=True, norm_pixel=False, show_interface=False,
+                   sensors={"rgb_camera": (RGBCamera, *camera)})
+    return MetaDriveEnv(cfg)

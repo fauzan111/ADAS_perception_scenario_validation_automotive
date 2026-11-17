@@ -2,6 +2,10 @@
 
 Closed-loop validation of a camera-based ACC/AEB system in simulated driving scenarios: a car cutting in, a pedestrian stepping out from behind a parked van, a lead car braking hard. Each runs by day and at night, in clear weather, rain and fog. A real detector, measured on simulator images and cross-checked against published nuScenes results, drives a perception error model. Every verdict comes from simulator ground truth. Each collision is traced to its triggering condition with counterfactual reruns (a SOTIF-style failure table), and parameter sweeps find where the system stops being safe.
 
+![Demo: the lead car brakes hard at 130 km/h. As tested, the AEB assumes it keeps its speed, brakes late and hits; told the lead's deceleration, it stops 4 m short](docs/media/demo_lead_brake.gif)
+
+**[Demo video (2 min, 1080p)](https://github.com/fauzan111/ADAS_perception_scenario_validation_automotive/releases/download/demo-v1/adas_demo.mp4)**: four closed-loop runs seen through the MetaDrive ego camera, with raw detections and confirmed tracks projected into the image, a to-scale bird's-eye view and the ADAS mode, followed by the failure attribution and the sweep boundaries. Captions and verdicts are generated from each run's own trace (`make demo-record demo-video`).
+
 ![Detector recall vs range by condition, with nuScenes DETR3D car AP for comparison](docs/figures/detector_recall.png)
 
 ## Why it matters
@@ -99,17 +103,19 @@ All findings are from simulation, with stated assumptions: position noise, laten
 
 ## Quickstart
 
-You need [uv](https://docs.astral.sh/uv/). Docker is only needed for the camera calibration.
+You need [uv](https://docs.astral.sh/uv/). Docker is only needed for the camera calibration and for recording the demo clips.
 
 ```bash
 make setup-sim            # MetaDrive (Python 3.11)
-make test                 # 29 tests, including a MetaDrive smoke run
+make test                 # 32 tests, including a MetaDrive smoke run
 make scenarios            # assumed model     -> results/catalogue/report.md
 make scenarios-measured   # sim-measured model -> results/catalogue_measured/report.md
 make sotif sotif-edge     # counterfactual failure attribution -> results/sotif_*/failure_table.md
 make sweeps               # pass/fail boundaries (~11 min) -> docs/figures/sweep_*.png
 make render-calibration   # Docker: render + detect (~10 min; macOS can't render offscreen)
 make fit-calibration      # fit curves -> configs/perception_model_*.yaml + the figure above
+make demo-record          # Docker: dashcam frames + traces of the four demo clips (~8 min)
+make demo-video           # -> results/demo/adas_demo.mp4 + docs/media/demo_lead_brake.gif
 ```
 
 ## Roadmap

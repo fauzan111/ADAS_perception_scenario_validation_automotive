@@ -62,3 +62,13 @@ sweeps:                 # pass/fail boundaries (~11 min) -> docs/figures/sweep_*
 sotif-edge:             # attribute the sweep-found edge cases (sim-measured model)
 	uv run python -m adas_validation.sotif --catalogue configs/scenarios_edge.yaml \
 	  --perception configs/perception_model_measured.yaml --out results/sotif_edge
+
+.PHONY: demo-record demo-video
+
+demo-record: render-image   # dashcam frames + traces of the demo clips (Docker, ~3 min)
+	docker run --rm -v $(PWD):/work adas-render python -m adas_validation.demo record
+
+demo-video:             # -> results/demo/adas_demo.mp4, docs/media/demo_lead_brake.gif
+	uv sync --extra sim --extra video
+	uv run python -m adas_validation.demo stats
+	uv run python -m adas_validation.demo compose

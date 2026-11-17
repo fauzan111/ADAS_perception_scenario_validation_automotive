@@ -14,6 +14,7 @@ dependencies = [
 [project.optional-dependencies]
 perception = ["nuscenes-devkit>=1.1.11", "torch>=2.4", "torchvision>=0.19"]
 sim = ["metadrive-simulator>=0.4.2"]
+video = ["imageio-ffmpeg>=0.5"]
 
 [dependency-groups]
 dev = ["pytest>=8.0", "ruff>=0.6"]

@@ -98,11 +98,21 @@
 
 ## Week 6: polish
 
-- [ ] README results, video, LinkedIn post (ADAS, validazione)
+- [x] README results, demo video (`make demo-record demo-video`)
+- [ ] LinkedIn post (ADAS, validazione)
 
 ## Definition of done
 
-- [ ] Results table filled in the README
-- [ ] 2-minute demo video linked
-- [ ] Tests and lint green
+- [x] Results table filled in the README
+- [x] 2-minute demo video linked
+- [x] Tests and lint green
 - [ ] LinkedIn post (Italian and English)
+
+## Demo video notes (2026-11-17)
+
+- Clips are recorded in Docker (MetaDrive renders offscreen only there) with the camera grabbing
+  frames inside the same run whose trace drives the overlays, so detections, tracks, captions
+  and verdicts belong to the frames shown.
+- MetaDrive physics differs slightly between the Docker (Linux arm64) and macOS builds: the
+  130 km/h lead-brake clip (seed 0) collides at 31 km/h in Docker vs 37 km/h on the Mac. The
+  video quotes the recorded run; the "N of 30 seeds" numbers come from the host (`demo stats`).
