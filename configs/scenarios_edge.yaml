@@ -1,0 +1,40 @@
+# Edge cases found by the parameter sweeps (configs/sweeps.yaml): cells beyond the catalogue's
+# operating points where the system fails by day in clear weather although an ideal AEB would
+# not. `make sotif-edge` attributes their failures like the catalogue's.
+scenarios:
+  - name: lead_brake_110kph_gap15
+    kind: lead_brake
+    ego_speed_kph: 110
+    lighting: day
+    weather: clear
+    params: {lead_decel_mps2: 6.0, initial_gap_m: 15, brake_at_s: 2.0}
+  - name: lead_brake_130kph_gap30
+    kind: lead_brake
+    ego_speed_kph: 130
+    lighting: day
+    weather: clear
+    params: {lead_decel_mps2: 6.0, initial_gap_m: 30, brake_at_s: 2.0}
+  - name: cut_in_110kph_gap20
+    kind: cut_in
+    ego_speed_kph: 110
+    lighting: day
+    weather: clear
+    params: {cut_in_gap_m: 20, cutter_speed_kph: 60, lane_change_s: 2.5}
+  - name: cut_in_90kph_gap10
+    kind: cut_in
+    ego_speed_kph: 90
+    lighting: day
+    weather: clear
+    params: {cut_in_gap_m: 10, cutter_speed_kph: 60, lane_change_s: 2.5}
+  - name: occluded_pedestrian_45kph_2s
+    kind: occluded_pedestrian
+    ego_speed_kph: 45
+    lighting: day
+    weather: clear
+    params: {pedestrian_speed_mps: 1.4, van_distance_m: 60, trigger_time_s: 2.0}
+  - name: occluded_pedestrian_30kph_1p75s
+    kind: occluded_pedestrian
+    ego_speed_kph: 30
+    lighting: day
+    weather: clear
+    params: {pedestrian_speed_mps: 1.4, van_distance_m: 60, trigger_time_s: 1.75}

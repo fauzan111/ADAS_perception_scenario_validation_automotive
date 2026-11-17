@@ -6,7 +6,10 @@
   crossing pedestrian or a cutting-in car becomes relevant before it is fully in the lane.
 - ACC: hold the set speed, or a time gap to the in-path lead (IDM-style law).
 - FCW at TTC < fcw_ttc_s (warning only, logged); AEB: full braking when TTC < aeb_ttc_s or
-  when the deceleration needed to stop short exceeds aeb_required_decel.
+  when the deceleration needed to stop short exceeds aeb_required_decel. The tracker gives no
+  acceleration, so the required deceleration assumes the lead keeps its speed: against a
+  braking lead the AEB fires late. If a track carries a deceleration (counterfactual runs),
+  the ego must also stop within the gap plus the lead's own stopping distance.
 - Available deceleration depends on the road: dry 9 m/s^2, wet (rain) 6.5 m/s^2. This is an
   explicit assumption standing in for tyre friction (the simulator's friction is not varied).
 """
@@ -64,9 +67,10 @@ def ttc(track: Track, ego_speed: float) -> float:
     return track.x / closing if closing > 0 else math.inf
 
 
-def control(ego_speed: float, tracks: list[Track], cfg: AdasConfig, weather: str
-            ) -> AdasOutput:
-    max_decel = MAX_DECEL[weather]
+def control(ego_speed: float, tracks: list[Track], cfg: AdasConfig, weather: str,
+            max_decel: float | None = None) -> AdasOutput:
+    """max_decel overrides the road-dependent braking limit (counterfactual runs)."""
+    max_decel = MAX_DECEL[weather] if max_decel is None else max_decel
     relevant = [tr for tr in tracks if in_path(tr, ego_speed, cfg)]
     lead = min(relevant, key=lambda tr: tr.x, default=None)
     # ACC (IDM-style): free road term plus interaction term
@@ -82,6 +86,9 @@ def control(ego_speed: float, tracks: list[Track], cfg: AdasConfig, weather: str
                              - (max(desired, 0) / gap) ** 2)
     t = ttc(lead, ego_speed)
     required = dv * dv / (2 * gap) if dv > 0 else 0.0
+    if lead.ax < -0.1:                 # braking lead: stop within gap + its stopping distance
+        lead_stop = max(lead.vx, 0.0) ** 2 / (2 * -lead.ax)
+        required = max(required, ego_speed ** 2 / (2 * (gap + lead_stop)))
     if t < cfg.aeb_ttc_s or required > cfg.aeb_required_decel:
         return AdasOutput(-max_decel, "aeb", lead.track_id, t)
     accel = max(min(a_acc, cfg.max_accel), -cfg.comfort_decel)

@@ -1,0 +1,44 @@
+# Parameter sweeps: where is the pass/fail boundary of each scenario kind?
+# Every cell (x = ego speed, y, condition) runs `seeds` perception seeds. A cell is ok when its
+# pass rate is at least `pass_threshold` (18/20) or when the AEB collides there even with
+# ideal inputs (perfect perception, no latency).
+# Boundary: per y, the highest speed such that every speed up to it is ok; the worst case over
+# y is the speed limit that covers every y.
+# Failures are not monotonic in y (a pedestrian who starts late walks in behind the car; a
+# car cutting in at 5 m closes nothing at 70 km/h), so the worst case is the useful number.
+seeds: 20
+pass_threshold: 0.9
+
+sweeps:
+  - name: occluded_pedestrian
+    title: "Pedestrian from behind a parked van: ego speed x pedestrian timing"
+    base:
+      kind: occluded_pedestrian
+      ego_speed_kph: 40
+      params: {pedestrian_speed_mps: 1.4, van_distance_m: 60, trigger_time_s: 2.0}
+    x: {field: ego_speed_kph, label: "ego speed (km/h)", values: [20, 25, 30, 35, 40, 45, 50]}
+    y: {field: params.trigger_time_s, label: "time to reach the pedestrian at start (s)",
+        values: [1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]}
+    conditions: [[day, clear], [day, rain], [night, clear], [night, rain]]
+
+  - name: lead_brake
+    title: "Lead car brakes at 6 m/s^2: ego speed x initial gap"
+    base:
+      kind: lead_brake
+      ego_speed_kph: 90
+      params: {lead_decel_mps2: 6.0, initial_gap_m: 30, brake_at_s: 2.0}
+    x: {field: ego_speed_kph, label: "speed (km/h)", values: [50, 70, 90, 110, 130]}
+    y: {field: params.initial_gap_m, label: "initial gap (m)",
+        values: [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]}
+    conditions: [[day, clear], [day, rain], [night, fog]]
+
+  - name: cut_in
+    title: "Car cuts in at 60 km/h: ego speed x cut-in gap"
+    base:
+      kind: cut_in
+      ego_speed_kph: 90
+      params: {cut_in_gap_m: 20, cutter_speed_kph: 60, lane_change_s: 2.5}
+    x: {field: ego_speed_kph, label: "ego speed (km/h)", values: [70, 80, 90, 100, 110, 120]}
+    y: {field: params.cut_in_gap_m, label: "gap when the cut-in starts (m)",
+        values: [5, 10, 15, 20, 25, 30]}
+    conditions: [[day, clear], [night, fog]]

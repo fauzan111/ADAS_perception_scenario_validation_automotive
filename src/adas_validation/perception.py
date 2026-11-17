@@ -76,6 +76,24 @@ class PerceptionModel:
             ghost_rate_hz=raw["ghost_rate_hz"],
             class_range_factor=raw.get("class_range_factor", {}))
 
+    def oracle(self, latency_s: float | None = None, keep_noise: bool = False
+               ) -> PerceptionModel:
+        """Perfect perception for counterfactual runs: every object at least
+        min_visible_fraction visible is detected at any range, without ghosts and (unless
+        keep_noise) without position noise. Occlusion still hides objects (it is geometry,
+        not sensor quality)."""
+        classes = {k: ClassParams(r50_m=1e6, softness_m=1.0, p_max=1.0,
+                                  sigma_m=c.sigma_m if keep_noise else 0.0,
+                                  sigma_growth=c.sigma_growth if keep_noise else 0.0)
+                   for k, c in self.classes.items()}
+        return PerceptionModel(
+            classes=classes,
+            range_factor={k: 1.0 for k in self.range_factor},
+            noise_factor=(dict(self.noise_factor) if keep_noise
+                          else {k: 1.0 for k in self.noise_factor}),
+            latency_s=self.latency_s if latency_s is None else latency_s,
+            min_visible_fraction=self.min_visible_fraction, ghost_rate_hz=0.0)
+
     def detection_probability(self, cls: str, rng_m: float, lighting: str, weather: str,
                               visible_fraction: float = 1.0) -> float:
         if visible_fraction < self.min_visible_fraction:
@@ -97,16 +115,18 @@ class PerceptionModel:
              weather: str, rng: np.random.Generator) -> list[Detection]:
         """Measure the scene at time t; return the frame that becomes available at t
         (the one measured latency_s ago), so the controller always acts on old data."""
+        # The same random draws are made every frame whatever is detected, so a counterfactual
+        # run with the same seed (e.g. perfect detection) sees exactly the same noise.
         frame = []
         for o in objects:
             r = math.hypot(o.x, o.y)
-            if rng.random() < self.detection_probability(o.cls, r, lighting, weather,
-                                                         o.visible_fraction):
+            u, nx, ny = rng.random(), rng.normal(), rng.normal()
+            if u < self.detection_probability(o.cls, r, lighting, weather, o.visible_fraction):
                 s = self.position_sigma(o.cls, r, lighting, weather)
-                frame.append(Detection(o.obj_id, o.cls, o.x + rng.normal(0, s),
-                                       o.y + rng.normal(0, s * 0.5), t))
-        if self.ghost_rate_hz > 0 and rng.random() < self.ghost_rate_hz * dt:
-            frame.append(Detection(None, "car", rng.uniform(10, 60), rng.normal(0, 0.5), t))
+                frame.append(Detection(o.obj_id, o.cls, o.x + nx * s, o.y + ny * s * 0.5, t))
+        ug, gx, gy = rng.random(), rng.uniform(10, 60), rng.normal(0, 0.5)
+        if ug < self.ghost_rate_hz * dt:
+            frame.append(Detection(None, "car", gx, gy, t))
         self._queue.append((t, frame))
         out: list[Detection] = []
         while self._queue and self._queue[0][0] <= t - self.latency_s + 1e-9:
@@ -127,6 +147,7 @@ class Track:
     obj_id: str | None = None   # ground-truth id of the first detection (metrics only)
     confirmed: bool = False
     n_updates: int = 0
+    ax: float = 0.0             # acceleration; the tracker does not estimate it (stays 0)
 
 
 class Tracker:
@@ -140,8 +161,9 @@ class Tracker:
     """
 
     def __init__(self, gate_m: float = 3.0, alpha: float = 0.5, beta: float = 0.2,
-                 max_coast_s: float = 0.6) -> None:
+                 max_coast_s: float = 0.6, confirm_hits: int = 3) -> None:
         self.gate_m, self.alpha, self.beta, self.max_coast_s = gate_m, alpha, beta, max_coast_s
+        self.confirm_hits = confirm_hits
         self.tracks: list[Track] = []
         self._next = 0
 
@@ -171,11 +193,11 @@ class Tracker:
                 tr.last_t = t
             else:
                 tr.hits.append(0)
-            if sum(tr.hits[-5:]) >= 3:
+            if sum(tr.hits[-5:]) >= self.confirm_hits:
                 tr.confirmed = True
         for d in unmatched:
             self.tracks.append(Track(self._next, d.cls, d.x, d.y, hits=[1], last_t=t,
-                                     obj_id=d.obj_id))
+                                     obj_id=d.obj_id, confirmed=self.confirm_hits <= 1))
             self._next += 1
         self.tracks = [tr for tr in self.tracks if t - tr.last_t <= self.max_coast_s]
         return [tr for tr in self.tracks if tr.confirmed]

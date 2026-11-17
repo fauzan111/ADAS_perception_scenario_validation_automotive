@@ -56,6 +56,7 @@ class RunResult:
     first_detect_range_m: float | None   # range when the hazard was first a confirmed track
     aeb_triggered: bool
     aeb_gap_m: float | None              # true bumper-to-hazard distance when AEB first fired
+    first_visible_range_m: float | None  # true range when the hazard was first visible enough
     end_reason: str
     trace: list = field(default_factory=list, repr=False)
 
@@ -93,7 +94,10 @@ class ScenarioScript:
                                           EGO_LANE_Y + LANE_W + 0.3, length=2 * PED_R,
                                           width=2 * PED_R)
             self.walk_speed = p["pedestrian_speed_mps"]
-            self.trigger_m = p.get("trigger_distance_m", 25.0)
+            # start walking when the ego is trigger_distance_m away, or trigger_time_s away
+            # at its initial speed (timing comparable across speeds, for sweeps)
+            self.trigger_m = (p["trigger_time_s"] * ego_speed + EGO_LEN / 2
+                              if "trigger_time_s" in p else p.get("trigger_distance_m", 25.0))
             self.walking = False
         else:
             raise ValueError(f"unknown scenario kind {sc.kind}")
@@ -150,8 +154,12 @@ class LongitudinalLoop:
 
 
 def run_scenario(sc: Scenario, seed: int, model: PerceptionModel, env=None,
-                 max_time_s: float = 20.0, keep_trace: bool = False) -> RunResult:
-    """One scenario run. Pass an open MetaDrive env to reuse it across runs."""
+                 max_time_s: float = 20.0, keep_trace: bool = False,
+                 max_decel: float | None = None, confirm_hits: int = 3,
+                 known_lead_accel: bool = False) -> RunResult:
+    """One scenario run. Pass an open MetaDrive env to reuse it across runs.
+    max_decel, confirm_hits and known_lead_accel (hazard tracks carry the true acceleration)
+    change the system for counterfactual runs (sotif.py)."""
     from metadrive.component.traffic_participants.pedestrian import Pedestrian
     from metadrive.component.vehicle.vehicle_type import DefaultVehicle, LVehicle
 
@@ -179,13 +187,14 @@ def run_scenario(sc: Scenario, seed: int, model: PerceptionModel, env=None,
             bodies[name] = env.engine.spawn_object(cls, vehicle_config={}, position=pos,
                                                    heading=0.0)
     model.reset()
-    tracker = Tracker()
+    tracker = Tracker(confirm_hits=confirm_hits)
     cfg = AdasConfig(set_speed_mps=v0)
     loop = LongitudinalLoop()
     hazard = script.actors[script.hazard]
-    min_ttc, first_detect, aeb_gap = math.inf, None, None
+    min_ttc, first_detect, aeb_gap, first_visible = math.inf, None, None, None
     collided, impact, end = False, 0.0, "timeout"
     prev_v, trace = ego.speed, []
+    prev_hz_vx, hz_ax = hazard.vx, 0.0
     stopped_for = 0.0
     for k in range(int(max_time_s / DT)):
         t = k * DT
@@ -193,6 +202,7 @@ def run_scenario(sc: Scenario, seed: int, model: PerceptionModel, env=None,
         ego_y = ego.position[1]
         ego_v = ego.speed
         script.step(t, ego_x)
+        hz_ax, prev_hz_vx = (hazard.vx - prev_hz_vx) / DT, hazard.vx
         # ground truth checks
         min_ttc = min(min_ttc, true_ttc(ego_x, ego_v, hazard))
         ego_box = Box(ego_x, ego_y, EGO_LEN, EGO_W)
@@ -209,13 +219,18 @@ def run_scenario(sc: Scenario, seed: int, model: PerceptionModel, env=None,
                 continue
             near_x = a.x - (a.length / 2 if a.cls == "car" else 0.0)
             vis = visible_fraction((sx, sy), a.box(), script.occluders())
+            if (a.obj_id == script.hazard and first_visible is None
+                    and vis >= model.min_visible_fraction):
+                first_visible = math.hypot(near_x - sx, a.y - sy)
             objs.append(TrueObject(a.obj_id, a.cls, near_x - sx, a.y - sy, a.vx, a.vy, vis))
         dets = model.step(t, DT, objs, sc.lighting, sc.weather, rng)
         tracks = tracker.step(t, DT, dets)
         for tr in tracks:
             if first_detect is None and tr.obj_id == script.hazard:
                 first_detect = math.hypot(tr.x, tr.y)
-        out = control(ego_v, [_relative(tr, ego_v) for tr in tracks], cfg, sc.weather)
+        out = control(ego_v, [_relative(tr, ego_v, hz_ax if known_lead_accel
+                                        and tr.obj_id == script.hazard else 0.0)
+                              for tr in tracks], cfg, sc.weather, max_decel)
         if out.mode == "aeb" and aeb_gap is None:
             aeb_gap = (hazard.x - hazard.length / 2) - (ego_x + EGO_LEN / 2)
         a_meas = (ego_v - prev_v) / DT
@@ -247,14 +262,14 @@ def run_scenario(sc: Scenario, seed: int, model: PerceptionModel, env=None,
     if own_env:
         env.close()
     return RunResult(sc.name, seed, collided, impact, min_ttc, first_detect,
-                     aeb_gap is not None, aeb_gap, end, trace)
+                     aeb_gap is not None, aeb_gap, first_visible, end, trace)
 
 
-def _relative(tr, ego_v):
+def _relative(tr, ego_v, ax=0.0):
     """Tracker velocities are relative to the ego; the controller wants absolute vx."""
     from adas_validation.perception import Track
     return Track(tr.track_id, tr.cls, tr.x, tr.y, tr.vx + ego_v, tr.vy, tr.hits, tr.last_t,
-                 tr.obj_id, tr.confirmed, tr.n_updates)
+                 tr.obj_id, tr.confirmed, tr.n_updates, ax)
 
 
 def _wrap(a: float) -> float:

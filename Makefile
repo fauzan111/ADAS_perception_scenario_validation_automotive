@@ -40,3 +40,25 @@ fit-calibration:        # -> configs/perception_model_measured.yaml + docs/figur
 scenarios-measured:     # catalogue with the measured perception model
 	uv run python -m adas_validation.experiments --seeds 30 \
 	  --perception configs/perception_model_measured.yaml --out results/catalogue_measured
+
+.PHONY: scenarios-nuscenes sotif sweeps sotif-edge
+
+scenarios-nuscenes:     # catalogue with the nuScenes-anchored perception model
+	uv run python -m adas_validation.experiments --seeds 30 \
+	  --perception configs/perception_model_nuscenes_anchored.yaml --out results/catalogue_nuscenes
+
+sotif:                  # failure attribution (SOTIF table) for each perception model
+	for m in assumed:perception_model measured:perception_model_measured \
+	         nuscenes:perception_model_nuscenes_anchored; do \
+	  uv run python -m adas_validation.sotif --perception configs/$${m#*:}.yaml \
+	    --out results/sotif_$${m%%:*} || exit 1; done
+
+sweeps:                 # pass/fail boundaries (~11 min) -> docs/figures/sweep_*.png
+	uv run python -m adas_validation.sweeps \
+	  --perception configs/perception_model_measured.yaml \
+	               configs/perception_model_nuscenes_anchored.yaml \
+	  --labels sim-measured nuScenes-anchored --out results/sweeps
+
+sotif-edge:             # attribute the sweep-found edge cases (sim-measured model)
+	uv run python -m adas_validation.sotif --catalogue configs/scenarios_edge.yaml \
+	  --perception configs/perception_model_measured.yaml --out results/sotif_edge

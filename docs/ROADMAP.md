@@ -34,8 +34,8 @@
 
 - [x] MetaDrive runner for the YAML catalogue with TTC logging
 - [x] Pass-rate report by kind, lighting and weather (Wilson 95% CIs)
-- [ ] Failure table in SOTIF style (triggering conditions) and parameter sweeps
-      (gap x speed, trigger distance x speed) to find the pass/fail boundaries
+- [x] Failure table in SOTIF style (triggering conditions) and parameter sweeps
+      (gap x speed, pedestrian timing x speed) to find the pass/fail boundaries
 - [x] Calibrate the perception error model (sim-measured + nuScenes-anchored, see above)
 
 ### Scenario notes (2026-11-16)
@@ -62,6 +62,34 @@
   by day and night: visible only at ~10 m, and at 6.5 m/s^2 the car needs ~9.5 m plus
   reaction time from 40 km/h; day clear 77%). Occlusion and road friction, not lighting,
   dominate the pedestrian case.
+
+### SOTIF and sweep notes (2026-11-17)
+
+- Attribution by counterfactual reruns, cause = first step that removes the collision:
+  perfect detection -> no position noise -> dry-road braking -> no latency + instant
+  confirmation -> AEB knows the lead's deceleration -> otherwise a design limit.
+- Two attribution artefacts were found and fixed before any table was kept:
+  - "Perfect detection" first removed 5 of 6 daytime pedestrian collisions, although the
+    measured detection probability is ~1.0 at 10-20 m. Cause: random draws depended on what
+    was detected, so the rerun got different position noise. The perception model now draws
+    noise and ghost values every frame whatever is detected; same seed = same noise. Result:
+    those failures are noise (lateral-velocity estimate), not detection.
+  - First version called everything the oracle could not fix "unavoidable". A cut-in at
+    20 m with 14 m/s closing is avoidable by braking at the first lateral drift; this AEB
+    only brakes for objects predicted in its path. Renamed "design limit".
+- The random-draw change shifted the catalogue slightly (68/59/34% -> 70/60/35%); the
+  0/60 pedestrian-in-rain result is unchanged.
+- First sweep design was misleading: failures are not monotonic (a pedestrian who starts
+  late walks in behind the car; a 5 m cut-in closes nothing at 70 km/h), and some cells are
+  beyond any AEB (step-out 1.5 s ahead). Pedestrian timing is now in seconds (comparable
+  across speeds), each cell gets an ideal-input reference run, and a cell only counts against
+  the system if the ideal-input AEB avoids the collision there.
+- New design weakness found by the sweeps: at 110-130 km/h the AEB fires late against a
+  braking lead that is tracked the whole time, because the required-deceleration check
+  assumes the lead keeps its speed (Euro NCAP CCRb case). Not fixed: it is part of the system
+  under test; mitigation proposed in docs/SOTIF.md.
+- The smoke test asserted "stopped" within 12 s; it only passed on seed 0's draws. Now it
+  checks what matters (no collision, AEB triggered).
 
 ## Week 5: CARLA
 
